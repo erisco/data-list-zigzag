@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | The feature of this module is 'ZigZag' and its class instances. It
 --  is an abstract data type and can be constructed \/ deconstructed
@@ -45,6 +46,17 @@ import Data.Foldable
   )
 --
 
+import Data.Functor.Classes
+  ( Eq1(liftEq)
+  , Ord1(liftCompare)
+  , Read1(liftReadList, liftReadsPrec)
+  , readsData
+  , readsUnaryWith
+  , showsUnaryWith
+  , Show1(liftShowList, liftShowsPrec)
+  )
+--
+
 import Data.List
   ( transpose
   , unzip
@@ -81,6 +93,18 @@ import Data.Typeable
 import GHC.Base
   ( Functor(fmap)
   , (.)
+  , ($)
+  )
+--
+
+import GHC.Exts
+  ( IsList(Item)
+  )
+--
+
+import qualified GHC.Exts as IsList
+  ( fromList
+  , toList
   )
 --
 
@@ -91,18 +115,32 @@ import GHC.Generics
 --
 
 import GHC.Read
-  ( Read
+  ( lexP
+  , parens
+  , Read(readPrec)
   )
 --
 
 import GHC.Show
-  ( Show(show)
+  ( Show(showsPrec)
+  , showParen
+  , showString
   )
 --
 
 import Prelude
   ( Eq
-  , Ord
+  , Ord((>))
+  )
+--
+
+import Text.ParserCombinators.ReadPrec
+  ( prec
+  )
+--
+
+import Text.Read.Lex
+  ( Lexeme(Ident)
   )
 --
 
@@ -115,6 +153,7 @@ newtype Diagonal a =
   , Applicative
   , Data
   , Eq
+  , Eq1
   , Foldable
   , Functor
   , Generic
@@ -123,12 +162,20 @@ newtype Diagonal a =
   , MonadPlus
   , Monoid
   , Ord
+  , Ord1
   , Read
   , Semigroup
   , Show
+  , Show1
   , Traversable
   , Typeable
   )
+--
+
+instance IsList (Diagonal a) where
+  type (Item (Diagonal a)) = a
+  fromList = Diagonal
+  toList = unDiagonal
 --
 
 -- NOTE: also defined in the "these" package but it has too many
@@ -178,12 +225,13 @@ newtype ZigZag a =
   deriving
   ( Data
   , Eq
+  -- , Eq1
   , Foldable
   , Functor
   , Generic
   , Generic1
   , Ord
-  , Read
+  -- , Ord1
   , Traversable
   , Typeable
   )
@@ -201,6 +249,16 @@ instance Alternative ZigZag where
 instance Applicative ZigZag where
   pure = return
   (<*>) = ap
+--
+
+instance Eq1 ZigZag where
+  liftEq eq (ZigZag xs) (ZigZag ys) = liftEq (liftEq eq) xs ys
+--
+
+instance IsList (ZigZag a) where
+  type (Item (ZigZag a)) = a
+  fromList = fromList
+  toList = toList
 --
 
 instance Monad ZigZag where
@@ -225,13 +283,51 @@ instance Monoid (ZigZag a) where
   mappend = (<|>) 
 --
 
+instance Ord1 ZigZag where
+  liftCompare cmp (ZigZag xs) (ZigZag ys) =
+    liftCompare (liftCompare cmp) xs ys
+  --
+--
+
+instance Read a => Read (ZigZag a) where
+  readPrec = parens . prec 10 $ do
+    Ident "fromDiagonals" <- lexP
+    xs <- readPrec
+    return (fromDiagonals xs)
+--
+
+instance Read1 ZigZag where
+  liftReadsPrec rp rl =
+    readsData $
+    readsUnaryWith
+    (liftReadsPrec (liftReadsPrec rp rl) (liftReadList rp rl))
+    "fromDiagonals"
+    fromDiagonals
+--
+
 instance Semigroup (ZigZag a) where
   (<>) = mappend
 --
 
 instance Show a => Show (ZigZag a) where
-  show xs = "fromDiagonals " ++ show (toDiagonals xs)
+  showsPrec p xs =
+    showParen (p > 10)
+    ( showString "fromDiagonals "
+    . showsPrec 10 (toDiagonals xs)
+    )
 --
+
+instance Show1 ZigZag where
+  liftShowsPrec sp sl d m =
+    showsUnaryWith
+    (liftShowsPrec (liftShowsPrec sp sl) (liftShowList sp sl))
+    "fromDiagonals"
+    d
+    (toDiagonals m)
+--
+
+-- liftShowsPrec :: (Int -> [a] -> ShowS) -> ([[a]] -> ShowS) -> Int 
+-- -> [[a]] -> ShowS
 
 -- | Finds the diagonals through a ragged list of lists.
 --
