@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                data-list-zigzag
-version:             0.1.1.0
+version:             0.1.1.1
 synopsis:            A list but with a balanced enumeration of Cartesian product.
 description:         A list but with a balanced enumeration of Cartesian product.
 homepage:            https://github.com/erisco/data-list-zigzag
@@ -20,7 +20,7 @@ library
   
   exposed-modules:     Data.List.ZigZag
   
-  build-depends:       base >=4.9 && <4.10
+  build-depends:       base >=4.9 && <=9223372036854775807
                        
   hs-source-dirs:      src
   
@@ -33,4 +33,4 @@ source-repository head
 source-repository this
   type:     git
   location: https://github.com/erisco/data-list-zigzag
-  tag:      v0.1.1.0
+  tag:      v0.1.1.1
